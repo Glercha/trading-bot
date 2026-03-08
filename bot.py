@@ -22,7 +22,7 @@ from binance_client import BinanceClient
 from risk_manager import RiskManager
 
 # ─── Setup ────────────────────────────────────────────────────────────────────
-load_dotenv("bot.env")
+load_dotenv(override=False)
 config = Config()
 
 # Logging
