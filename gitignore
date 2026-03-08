@@ -1,0 +1,7 @@
+.env
+bot.env
+__pycache__/
+*.pyc
+bot.log
+trade_history.json
+venv/

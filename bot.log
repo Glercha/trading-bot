@@ -1,0 +1,107 @@
+2026-03-08 16:56:04,036 [INFO] 🚀 Trading Bot gestartet
+2026-03-08 16:56:04,036 [INFO]    Symbol: BTCUSDT
+2026-03-08 16:56:04,036 [INFO]    Leverage: 20x
+2026-03-08 16:56:04,036 [INFO]    Risiko/Trade: 2.0%
+2026-03-08 16:56:04,036 [INFO]    Max Tagesverlust: 6.0%
+2026-03-08 16:56:04,036 [INFO]    Testnet: True
+2026-03-08 17:15:29,062 [INFO] 🚀 Trading Bot gestartet
+2026-03-08 17:15:29,062 [INFO]    Symbol: BTCUSDT
+2026-03-08 17:15:29,062 [INFO]    Leverage: 20x
+2026-03-08 17:15:29,062 [INFO]    Risiko/Trade: 2.0%
+2026-03-08 17:15:29,063 [INFO]    Max Tagesverlust: 6.0%
+2026-03-08 17:15:29,063 [INFO]    Testnet: True
+2026-03-08 17:17:42,556 [INFO] 🚀 Trading Bot gestartet
+2026-03-08 17:17:42,556 [INFO]    Symbol: BTCUSDT
+2026-03-08 17:17:42,556 [INFO]    Leverage: 20x
+2026-03-08 17:17:42,556 [INFO]    Risiko/Trade: 2.0%
+2026-03-08 17:17:42,556 [INFO]    Max Tagesverlust: 6.0%
+2026-03-08 17:17:42,556 [INFO]    Testnet: True
+2026-03-08 17:19:05,644 [INFO] 🚀 Trading Bot gestartet
+2026-03-08 17:19:05,644 [INFO]    Symbol: BTCUSDT
+2026-03-08 17:19:05,644 [INFO]    Leverage: 20x
+2026-03-08 17:19:05,644 [INFO]    Risiko/Trade: 2.0%
+2026-03-08 17:19:05,644 [INFO]    Max Tagesverlust: 6.0%
+2026-03-08 17:19:05,644 [INFO]    Testnet: True
+2026-03-08 17:22:18,556 [INFO] 🚀 Trading Bot gestartet
+2026-03-08 17:22:18,556 [INFO]    Symbol: BTCUSDT
+2026-03-08 17:22:18,557 [INFO]    Leverage: 20x
+2026-03-08 17:22:18,557 [INFO]    Risiko/Trade: 2.0%
+2026-03-08 17:22:18,557 [INFO]    Max Tagesverlust: 6.0%
+2026-03-08 17:22:18,557 [INFO]    Testnet: True
+2026-03-08 17:22:18,652 [INFO] [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://192.168.1.129:3000
+2026-03-08 17:22:18,652 [INFO] [33mPress CTRL+C to quit[0m
+2026-03-08 17:23:24,208 [ERROR] Binance API Error [-2014]: API-key format invalid.
+2026-03-08 17:23:24,209 [INFO] 127.0.0.1 - - [08/Mar/2026 17:23:24] "[35m[1mGET /health HTTP/1.1[0m" 500 -
+2026-03-08 17:23:24,323 [INFO] 127.0.0.1 - - [08/Mar/2026 17:23:24] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-03-08 17:29:06,089 [INFO] 🚀 Trading Bot gestartet
+2026-03-08 17:29:06,089 [INFO]    Symbol: BTCUSDT
+2026-03-08 17:29:06,089 [INFO]    Leverage: 20x
+2026-03-08 17:29:06,089 [INFO]    Risiko/Trade: 2.0%
+2026-03-08 17:29:06,089 [INFO]    Max Tagesverlust: 6.0%
+2026-03-08 17:29:06,089 [INFO]    Testnet: True
+2026-03-08 17:29:06,143 [INFO] [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://192.168.1.129:3000
+2026-03-08 17:29:06,143 [INFO] [33mPress CTRL+C to quit[0m
+2026-03-08 17:29:29,021 [ERROR] Binance API Error [-2014]: API-key format invalid.
+2026-03-08 17:29:29,023 [INFO] 127.0.0.1 - - [08/Mar/2026 17:29:29] "[35m[1mGET /health HTTP/1.1[0m" 500 -
+2026-03-08 17:29:31,457 [ERROR] Binance API Error [-2014]: API-key format invalid.
+2026-03-08 17:29:31,458 [INFO] 127.0.0.1 - - [08/Mar/2026 17:29:31] "[35m[1mGET /health HTTP/1.1[0m" 500 -
+2026-03-08 17:32:11,598 [INFO] 🚀 Trading Bot gestartet
+2026-03-08 17:32:11,598 [INFO]    Symbol: BTCUSDT
+2026-03-08 17:32:11,598 [INFO]    Leverage: 20x
+2026-03-08 17:32:11,598 [INFO]    Risiko/Trade: 2.0%
+2026-03-08 17:32:11,598 [INFO]    Max Tagesverlust: 6.0%
+2026-03-08 17:32:11,598 [INFO]    Testnet: True
+2026-03-08 17:32:11,611 [INFO] [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://192.168.1.129:3000
+2026-03-08 17:32:11,611 [INFO] [33mPress CTRL+C to quit[0m
+2026-03-08 17:32:16,474 [INFO] 🚀 Trading Bot gestartet
+2026-03-08 17:32:16,474 [INFO]    Symbol: BTCUSDT
+2026-03-08 17:32:16,474 [INFO]    Leverage: 20x
+2026-03-08 17:32:16,474 [INFO]    Risiko/Trade: 2.0%
+2026-03-08 17:32:16,474 [INFO]    Max Tagesverlust: 6.0%
+2026-03-08 17:32:16,474 [INFO]    Testnet: True
+2026-03-08 17:32:16,487 [INFO] [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://192.168.1.129:3000
+2026-03-08 17:32:16,487 [INFO] [33mPress CTRL+C to quit[0m
+2026-03-08 17:32:24,384 [ERROR] Binance API Error [-2014]: API-key format invalid.
+2026-03-08 17:32:24,385 [INFO] 127.0.0.1 - - [08/Mar/2026 17:32:24] "[35m[1mGET /health HTTP/1.1[0m" 500 -
+2026-03-08 17:32:27,111 [ERROR] Binance API Error [-2014]: API-key format invalid.
+2026-03-08 17:32:27,112 [INFO] 127.0.0.1 - - [08/Mar/2026 17:32:27] "[35m[1mGET /health HTTP/1.1[0m" 500 -
+2026-03-08 17:32:27,523 [ERROR] Binance API Error [-2014]: API-key format invalid.
+2026-03-08 17:32:27,524 [INFO] 127.0.0.1 - - [08/Mar/2026 17:32:27] "[35m[1mGET /health HTTP/1.1[0m" 500 -
+2026-03-08 17:34:15,216 [INFO] 🚀 Trading Bot gestartet
+2026-03-08 17:34:15,216 [INFO]    Symbol: BTCUSDT
+2026-03-08 17:34:15,216 [INFO]    Leverage: 20x
+2026-03-08 17:34:15,216 [INFO]    Risiko/Trade: 2.0%
+2026-03-08 17:34:15,216 [INFO]    Max Tagesverlust: 6.0%
+2026-03-08 17:34:15,216 [INFO]    Testnet: True
+2026-03-08 17:34:15,293 [INFO] [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://192.168.1.129:3000
+2026-03-08 17:34:15,293 [INFO] [33mPress CTRL+C to quit[0m
+2026-03-08 17:34:24,192 [ERROR] Binance API Error [-2014]: API-key format invalid.
+2026-03-08 17:34:24,194 [INFO] 127.0.0.1 - - [08/Mar/2026 17:34:24] "[35m[1mGET /health HTTP/1.1[0m" 500 -
+2026-03-08 17:35:10,539 [INFO] 🚀 Trading Bot gestartet
+2026-03-08 17:35:10,539 [INFO]    Symbol: BTCUSDT
+2026-03-08 17:35:10,539 [INFO]    Leverage: 20x
+2026-03-08 17:35:10,539 [INFO]    Risiko/Trade: 2.0%
+2026-03-08 17:35:10,539 [INFO]    Max Tagesverlust: 6.0%
+2026-03-08 17:35:10,539 [INFO]    Testnet: True
+2026-03-08 17:35:10,553 [INFO] [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://192.168.1.129:3000
+2026-03-08 17:35:10,553 [INFO] [33mPress CTRL+C to quit[0m
+2026-03-08 17:35:21,411 [ERROR] Binance API Error [-2014]: API-key format invalid.
+2026-03-08 17:35:21,412 [INFO] 127.0.0.1 - - [08/Mar/2026 17:35:21] "[35m[1mGET /health HTTP/1.1[0m" 500 -
