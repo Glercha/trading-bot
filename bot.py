@@ -244,6 +244,7 @@ def index():
 
 if __name__ == "__main__":
     log.info("🚀 Trading Bot gestartet")
+    log.info(f"   API Key geladen: {config.API_KEY[:8]}...{config.API_KEY[-4:]} (Länge: {len(config.API_KEY)})")
     log.info(f"   Symbol: {config.DEFAULT_SYMBOL}")
     log.info(f"   Leverage: {config.DEFAULT_LEVERAGE}x")
     log.info(f"   Risiko/Trade: {config.RISK_PER_TRADE}%")
