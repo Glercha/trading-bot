@@ -23,6 +23,9 @@ from risk_manager import RiskManager
 
 # ─── Setup ────────────────────────────────────────────────────────────────────
 load_dotenv(override=False)
+import os
+log.info(f"   Direct env check: {os.environ.get('BINANCE_API_KEY', 'NOT FOUND')[:8]}")
+
 config = Config()
 
 # Logging
