@@ -242,15 +242,15 @@ def index():
 
 # ─── Start ────────────────────────────────────────────────────────────────────
 
-if __name__ == "__main__":
-    log.info("🚀 Trading Bot gestartet")
-    log.info(f"   API Key geladen: {config.API_KEY[:8]}...{config.API_KEY[-4:]} (Länge: {len(config.API_KEY)})")
-    log.info(f"   Symbol: {config.DEFAULT_SYMBOL}")
-    log.info(f"   Leverage: {config.DEFAULT_LEVERAGE}x")
-    log.info(f"   Risiko/Trade: {config.RISK_PER_TRADE}%")
-    log.info(f"   Max Tagesverlust: {config.MAX_DAILY_LOSS}%")
-    log.info(f"   Testnet: {config.USE_TESTNET}")
+# ─── Start ────────────────────────────────────────────────────────────────────
 
+# Diese Zeilen laufen IMMER (auch unter gunicorn)
+log.info("🚀 Trading Bot gestartet")
+log.info(f"   Symbol: {config.DEFAULT_SYMBOL}")
+log.info(f"   Testnet: {config.USE_TESTNET}")
+log.info(f"   API Key geladen: '{config.API_KEY[:8]}...' (Länge: {len(config.API_KEY)})")
+
+if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
         port=config.PORT,
