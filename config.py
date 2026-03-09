@@ -11,8 +11,8 @@ class Config:
 
     def __init__(self):
         # ─── Binance API ──────────────────────────────────────────────────
-        self.API_KEY = os.getenv("cyBNLnyzQUdUebPtLFywhjZmc2t7YmPzuU5U1LS2scbokkmyKTz0gU8QX67aUP8w", "")
-        self.API_SECRET = os.getenv("f8KIPVjgpMDemWE6VNHlJFeM4lh2djpNa6ipLNU75Njs1xtR1TedYlRoPz1YyAQx", "")
+        self.API_KEY = os.getenv("BINANCE_API_KEY", "cyBNLnyzQUdUebPtLFywhjZmc2t7YmPzuU5U1LS2scbokkmyKTz0gU8QX67aUP8w")
+        self.API_SECRET = os.getenv("BINANCE_API_SECRET", "f8KIPVjgpMDemWE6VNHlJFeM4lh2djpNa6ipLNU75Njs1xtR1TedYlRoPz1YyAQx")
         self.USE_TESTNET = os.getenv("USE_TESTNET", "true").lower() == "true"
 
         # Binance Futures Endpoints
