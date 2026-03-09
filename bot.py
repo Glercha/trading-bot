@@ -10,7 +10,11 @@ Architektur:
                     → Binance Futures API
 """
 
+
+# load_dotenv nur lokal nutzen, nicht auf Render
 import os
+if os.path.exists(".env"):
+    load_dotenv()
 import json
 import logging
 from datetime import datetime, timezone
@@ -23,9 +27,7 @@ from risk_manager import RiskManager
 
 # ─── Setup ────────────────────────────────────────────────────────────────────
 # load_dotenv nur lokal nutzen, nicht auf Render
-import os
-if os.path.exists(".env"):
-    load_dotenv()
+load_dotenv(override=False)
 
 # Logging
 logging.basicConfig(
