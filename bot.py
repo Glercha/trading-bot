@@ -28,6 +28,7 @@ from risk_manager import RiskManager
 # ─── Setup ────────────────────────────────────────────────────────────────────
 # load_dotenv nur lokal nutzen, nicht auf Render
 load_dotenv(override=False)
+config = Config()
 
 # Logging
 logging.basicConfig(
