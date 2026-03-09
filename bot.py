@@ -22,8 +22,10 @@ from binance_client import BinanceClient
 from risk_manager import RiskManager
 
 # ─── Setup ────────────────────────────────────────────────────────────────────
-load_dotenv(override=False)
-config = Config()
+# load_dotenv nur lokal nutzen, nicht auf Render
+import os
+if os.path.exists(".env"):
+    load_dotenv()
 
 # Logging
 logging.basicConfig(
