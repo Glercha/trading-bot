@@ -23,9 +23,6 @@ from risk_manager import RiskManager
 
 # ─── Setup ────────────────────────────────────────────────────────────────────
 load_dotenv(override=False)
-import os
-log.info(f"   Direct env check: {os.environ.get('BINANCE_API_KEY', 'NOT FOUND')[:8]}")
-
 config = Config()
 
 # Logging
@@ -38,6 +35,11 @@ logging.basicConfig(
     ]
 )
 log = logging.getLogger("TradingBot")
+
+# Debug — nach dem Logger!
+log.info(f"API Key geladen: '{config.API_KEY[:8]}...' (Länge: {len(config.API_KEY)})")
+log.info(f"Direct env: '{os.environ.get('BINANCE_API_KEY', 'NOT FOUND')[:8]}...'")
+
 
 # Flask App
 app = Flask(__name__)
@@ -251,11 +253,4 @@ def index():
 log.info("🚀 Trading Bot gestartet")
 log.info(f"   Symbol: {config.DEFAULT_SYMBOL}")
 log.info(f"   Testnet: {config.USE_TESTNET}")
-log.info(f"   API Key geladen: '{config.API_KEY[:8]}...' (Länge: {len(config.API_KEY)})")
 
-if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=config.PORT,
-        debug=False
-    )
