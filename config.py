@@ -19,7 +19,7 @@ class Config:
             self.BASE_URL = "https://fapi.binance.com"
 
         # ─── Webhook ────────────────────────────────────────────────────────
-        self.WEBHOOK_PASSPHRASE = os.getenv("WEBHOOK_PASSPHRASE", "")
+        self.WEBHOOK_PASSPHRASE = os.getenv("WEBHOOK_PASSPHRASE", "ajsdljdsaojoOASJojdasj129")
 
         # ─── Defaults ───────────────────────────────────────────────────────
         self.DEFAULT_SYMBOL = os.getenv("DEFAULT_SYMBOL", "BTCUSDT")
@@ -33,8 +33,8 @@ class Config:
         self.MIN_BALANCE_USDT = float(os.getenv("MIN_BALANCE_USDT", "50"))
 
         # ─── Telegram ───────────────────────────────────────────────────────
-        self.TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-        self.TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+        self.TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8735205351:AAGeEXe1BPgSmNFYqt9uEq0kPX3Uc4F2LyA")
+        self.TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "1747500351")
         self.TELEGRAM_ENABLED = os.getenv("TELEGRAM_ENABLED", "true").lower() == "true"
 
         # ─── Optional ───────────────────────────────────────────────────────
