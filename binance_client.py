@@ -141,7 +141,7 @@ class BinanceClient:
             else:
                 raise
 
-    def set_margin_type(self, symbol: str, margin_type: str = "CROSSED"):
+    def set_margin_type(self, symbol: str, margin_type: str = "ISOLATED"):
         """Setzt den Margin-Typ (CROSSED oder ISOLATED)."""
         try:
             return self._request("POST", "/fapi/v1/marginType", {
