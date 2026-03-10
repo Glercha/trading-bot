@@ -35,16 +35,43 @@ class RiskManager:
         self.history_file = Path("trade_history.json")
         self._load_history()
 
+    # ─── Helpers ──────────────────────────────────────────────────────────────
+
+    def normalize_ticker(self, ticker: str) -> str:
+        """
+        Normalisiert externe Ticker in ein konsistentes Format.
+        Das ist hier vor allem für Logs/History nützlich.
+
+        Beispiele:
+        BTCUSDT.P   -> BTCUSDT
+        ETHUSDT.P   -> ETHUSDT
+        BTC/USDT    -> BTCUSDT
+        btcusdt     -> BTCUSDT
+        BTCUSDTPERP -> BTCUSDT
+        """
+        if not ticker:
+            return "UNKNOWN"
+
+        s = str(ticker).upper().strip()
+        s = s.replace("/", "").replace(":", "").replace("-", "")
+
+        for suffix in [".P", "PERP"]:
+            if s.endswith(suffix):
+                s = s[:-len(suffix)]
+
+        return s
+
     # ─── Daily Reset ──────────────────────────────────────────────────────────
 
     def _check_new_day(self):
         """Reset tägliche Zähler wenn neuer Tag."""
         today = date.today()
         if today != self._today:
-            log.info(f"📅 Neuer Tag: Reset tägliche Statistiken")
+            log.info("📅 Neuer Tag: Reset tägliche Statistiken")
             self._today = today
             self._trades_today = 0
             self._daily_pnl = 0.0
+            self._consecutive_losses = 0
             self._start_balance = None
 
     # ─── Trade Check ──────────────────────────────────────────────────────────
@@ -53,11 +80,37 @@ class RiskManager:
                     leverage: int = 20, risk_pct: float = 2.0) -> dict:
         """
         Prüft ob ein Trade erlaubt ist.
-        
+
         Returns:
             {"allowed": True/False, "reason": "..."}
         """
         self._check_new_day()
+
+        # Grundvalidierung
+        if signal not in ["LONG", "SHORT", "CLOSE"]:
+            return {
+                "allowed": False,
+                "reason": f"Ungültiges Signal: {signal}"
+            }
+
+        if signal in ["LONG", "SHORT"]:
+            if price is None or price <= 0:
+                return {
+                    "allowed": False,
+                    "reason": f"Ungültiger Price: {price}"
+                }
+
+            if leverage <= 0:
+                return {
+                    "allowed": False,
+                    "reason": f"Ungültiger Leverage: {leverage}"
+                }
+
+            if risk_pct <= 0:
+                return {
+                    "allowed": False,
+                    "reason": f"Ungültiges Risiko pro Trade: {risk_pct}%"
+                }
 
         # 1. Max Trades pro Tag
         if self._trades_today >= self.config.MAX_DAILY_TRADES:
@@ -121,26 +174,48 @@ class RiskManager:
                                 risk_pct: float = 2.0, ticker: str = "BTCUSDT") -> float:
         """
         Berechnet die Position Size basierend auf Risiko.
-        
+
         Formel:
             Risk Amount = Balance * (risk_pct / 100)
             SL Distance = |price - sl|
             Position Size = Risk Amount / SL Distance
-            
+
         Falls kein SL:
             Position Size = (Balance * risk_pct / 100) / price * leverage
         """
+        self._check_new_day()
+        ticker = self.normalize_ticker(ticker)
+
         if self._start_balance is None:
             self._start_balance = balance
 
+        # Grundvalidierung
+        if balance <= 0:
+            log.warning(f"⚠️ Ungültige Balance: {balance}")
+            return 0.0
+
+        if price <= 0:
+            log.warning(f"⚠️ Ungültiger Price für Position Sizing: {price}")
+            return 0.0
+
+        if leverage <= 0:
+            log.warning(f"⚠️ Ungültiger Leverage für Position Sizing: {leverage}")
+            return 0.0
+
+        if risk_pct <= 0:
+            log.warning(f"⚠️ Ungültiges Risiko % für Position Sizing: {risk_pct}")
+            return 0.0
+
         # Minimum Balance Check
         if balance < self.config.MIN_BALANCE_USDT:
-            log.warning(f"⚠️ Balance ({balance} USDT) unter Minimum ({self.config.MIN_BALANCE_USDT} USDT)")
+            log.warning(
+                f"⚠️ Balance ({balance} USDT) unter Minimum ({self.config.MIN_BALANCE_USDT} USDT)"
+            )
             return 0.0
 
         risk_amount = balance * (risk_pct / 100)
 
-        if sl and sl > 0 and price > 0:
+        if sl and sl > 0:
             sl_distance = abs(price - sl)
             if sl_distance == 0:
                 log.warning("SL-Distanz = 0, kann Position Size nicht berechnen")
@@ -151,6 +226,10 @@ class RiskManager:
         else:
             # Ohne SL: einfache Berechnung basierend auf Risiko %
             quantity = (risk_amount * leverage) / price
+
+        if quantity <= 0:
+            log.warning(f"⚠️ Berechnete Quantity ungültig: {quantity}")
+            return 0.0
 
         log.info(
             f"📐 Position Sizing: Balance={balance:.2f} USDT | "
@@ -168,6 +247,8 @@ class RiskManager:
         """Loggt einen ausgeführten Trade."""
         self._check_new_day()
         self._trades_today += 1
+
+        ticker = self.normalize_ticker(ticker)
 
         trade = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -193,6 +274,7 @@ class RiskManager:
 
     def record_trade_result(self, pnl: float):
         """Zeichnet das Ergebnis eines geschlossenen Trades auf."""
+        self._check_new_day()
         self._daily_pnl += pnl
 
         if pnl < 0:
@@ -236,14 +318,20 @@ class RiskManager:
         """Lädt Trade History aus Datei."""
         if self.history_file.exists():
             try:
-                self.history = json.loads(self.history_file.read_text())
-            except json.JSONDecodeError:
+                content = self.history_file.read_text(encoding="utf-8").strip()
+                self.history = json.loads(content) if content else []
+            except (json.JSONDecodeError, OSError) as e:
+                log.warning(f"⚠️ Konnte Trade History nicht laden: {e}")
                 self.history = []
         else:
             self.history = []
 
     def _save_history(self):
         """Speichert Trade History in Datei."""
-        self.history_file.write_text(
-            json.dumps(self.history, indent=2, default=str)
-        )
+        try:
+            self.history_file.write_text(
+                json.dumps(self.history, indent=2, default=str),
+                encoding="utf-8"
+            )
+        except OSError as e:
+            log.error(f"❌ Konnte Trade History nicht speichern: {e}")
