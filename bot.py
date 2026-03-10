@@ -10,14 +10,11 @@ Architektur:
                     → Binance Futures API
 """
 
-
-# load_dotenv nur lokal nutzen, nicht auf Render
 import os
-if os.path.exists(".env"):
-    load_dotenv()
 import json
 import logging
 from datetime import datetime, timezone
+
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 
@@ -25,9 +22,13 @@ from config import Config
 from binance_client import BinanceClient
 from risk_manager import RiskManager
 
+
 # ─── Setup ────────────────────────────────────────────────────────────────────
+
 # load_dotenv nur lokal nutzen, nicht auf Render
-load_dotenv(override=False)
+if os.path.exists(".env"):
+    load_dotenv(override=False)
+
 config = Config()
 
 # Logging
@@ -42,8 +43,12 @@ logging.basicConfig(
 log = logging.getLogger("TradingBot")
 
 # Debug — nach dem Logger!
-log.info(f"API Key geladen: '{config.API_KEY[:8]}...' (Länge: {len(config.API_KEY)})")
-log.info(f"Direct env: '{os.environ.get('BINANCE_API_KEY', 'NOT FOUND')[:8]}...'")
+api_key_preview = config.API_KEY[:8] + "..." if config.API_KEY else "NOT FOUND"
+env_api_key = os.environ.get("BINANCE_API_KEY", "")
+env_preview = env_api_key[:8] + "..." if env_api_key else "NOT FOUND"
+
+log.info(f"API Key geladen: '{api_key_preview}' (Länge: {len(config.API_KEY) if config.API_KEY else 0})")
+log.info(f"Direct env: '{env_preview}'")
 
 
 # Flask App
@@ -53,13 +58,27 @@ app = Flask(__name__)
 binance = BinanceClient(config)
 risk_mgr = RiskManager(config)
 
+
+# ─── Helper ───────────────────────────────────────────────────────────────────
+
+def normalize_ticker(raw_ticker: str) -> str:
+    """
+    Normalisiert externe Ticker (z.B. aus TradingView) in Binance Futures Format.
+    Beispiele:
+        BTCUSDT.P -> BTCUSDT
+        ETHUSDT.P -> ETHUSDT
+        BTC/USDT  -> BTCUSDT
+    """
+    return binance.normalize_symbol(raw_ticker)
+
+
 # ─── Webhook Endpoint ─────────────────────────────────────────────────────────
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
     """
     Empfängt TradingView Webhook Alerts.
-    
+
     Erwartetes JSON Format:
     {
         "passphrase": "dein_geheimes_passwort",
@@ -90,8 +109,12 @@ def webhook():
 
         # ─── 3. Signal validieren ─────────────────────────────────────────
         signal = data.get("signal", "").upper()
-        ticker = data.get("ticker", config.DEFAULT_SYMBOL).upper()
-        
+        raw_ticker = data.get("ticker", config.DEFAULT_SYMBOL).upper()
+        ticker = normalize_ticker(raw_ticker)
+
+        if raw_ticker != ticker:
+            log.info(f"🔄 Ticker normalisiert: {raw_ticker} -> {ticker}")
+
         if signal not in ["LONG", "SHORT", "CLOSE"]:
             log.warning(f"⚠️ Unbekanntes Signal: {signal}")
             return jsonify({"error": f"unknown signal: {signal}"}), 400
@@ -100,7 +123,13 @@ def webhook():
         if signal == "CLOSE":
             result = binance.close_position(ticker)
             log.info(f"🔴 Position geschlossen: {ticker}")
-            return jsonify({"status": "closed", "result": result}), 200
+
+            return jsonify({
+                "status": "closed",
+                "raw_ticker": raw_ticker,
+                "ticker": ticker,
+                "result": result
+            }), 200
 
         # ─── 5. Trade-Parameter extrahieren ───────────────────────────────
         price = float(data.get("price", 0))
@@ -108,6 +137,13 @@ def webhook():
         tp = float(data.get("tp", 0)) if data.get("tp") else None
         leverage = int(data.get("leverage", config.DEFAULT_LEVERAGE))
         risk_pct = float(data.get("risk_pct", config.RISK_PER_TRADE))
+        timeframe = str(data.get("timeframe", ""))
+
+        log.info(
+            f"📊 Signal verarbeitet | Signal={signal} | RawTicker={raw_ticker} | "
+            f"Ticker={ticker} | Price={price} | SL={sl} | TP={tp} | "
+            f"Leverage={leverage} | Risk={risk_pct}% | TF={timeframe}"
+        )
 
         # ─── 6. Risikomanagement prüfen ───────────────────────────────────
         risk_check = risk_mgr.check_trade(
@@ -122,6 +158,8 @@ def webhook():
             log.warning(f"🛡️ Trade abgelehnt: {risk_check['reason']}")
             return jsonify({
                 "status": "rejected",
+                "raw_ticker": raw_ticker,
+                "ticker": ticker,
                 "reason": risk_check["reason"]
             }), 200
 
@@ -136,18 +174,36 @@ def webhook():
             ticker=ticker
         )
 
+        log.info(
+            f"📐 Position Sizing: Balance={balance:.2f} USDT | "
+            f"Risk={risk_pct}% | Qty={quantity} {ticker}"
+        )
+
         if quantity <= 0:
             log.warning("⚠️ Position Size = 0, Trade übersprungen")
-            return jsonify({"status": "skipped", "reason": "quantity zero"}), 200
+            return jsonify({
+                "status": "skipped",
+                "raw_ticker": raw_ticker,
+                "ticker": ticker,
+                "reason": "quantity zero"
+            }), 200
 
-        # ─── 8. Bestehende Position schliessen ────────────────────────────
+        # ─── 8. Bestehende Position prüfen / ggf. schliessen ─────────────
         current_pos = binance.get_position(ticker)
         if current_pos and current_pos["size"] != 0:
-            opposite = (current_pos["side"] == "LONG" and signal == "SHORT") or \
-                       (current_pos["side"] == "SHORT" and signal == "LONG")
+            opposite = (
+                (current_pos["side"] == "LONG" and signal == "SHORT") or
+                (current_pos["side"] == "SHORT" and signal == "LONG")
+            )
+
             if opposite:
-                log.info(f"🔄 Gegenposition erkannt → schliesse {current_pos['side']}")
+                log.info(f"🔄 Gegenposition erkannt → schliesse {current_pos['side']} {ticker}")
                 binance.close_position(ticker)
+            else:
+                log.info(
+                    f"ℹ️ Bereits offene Position erkannt: "
+                    f"{current_pos['side']} {current_pos['size']} {ticker}"
+                )
 
         # ─── 9. Leverage setzen ───────────────────────────────────────────
         binance.set_leverage(ticker, leverage)
@@ -201,6 +257,7 @@ def webhook():
         return jsonify({
             "status": "executed",
             "signal": signal,
+            "raw_ticker": raw_ticker,
             "ticker": ticker,
             "quantity": quantity,
             "leverage": leverage,
@@ -242,7 +299,7 @@ def health():
 def index():
     return jsonify({
         "name": "TradingView → Binance Futures Bot",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "endpoints": {
             "/webhook": "POST — TradingView Alert empfangen",
             "/health": "GET — Status & Balance prüfen"
@@ -252,10 +309,7 @@ def index():
 
 # ─── Start ────────────────────────────────────────────────────────────────────
 
-# ─── Start ────────────────────────────────────────────────────────────────────
-
 # Diese Zeilen laufen IMMER (auch unter gunicorn)
 log.info("🚀 Trading Bot gestartet")
 log.info(f"   Symbol: {config.DEFAULT_SYMBOL}")
 log.info(f"   Testnet: {config.USE_TESTNET}")
-
