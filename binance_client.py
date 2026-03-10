@@ -26,6 +26,35 @@ class BinanceClient:
             "X-MBX-APIKEY": self.api_key
         })
 
+    # ─── Symbol Normalisierung ────────────────────────────────────────────────
+
+    def normalize_symbol(self, symbol: str) -> str:
+        """
+        Normalisiert Symbole aus TradingView/externen Quellen
+        in gültige Binance Futures Symbole.
+
+        Beispiele:
+        BTCUSDT.P   -> BTCUSDT
+        ETHUSDT.P   -> ETHUSDT
+        BTC/USDT    -> BTCUSDT
+        btcusdt     -> BTCUSDT
+        BTCUSDTPERP -> BTCUSDT
+        """
+        if not symbol:
+            raise ValueError("Leeres Symbol erhalten")
+
+        s = str(symbol).upper().strip()
+
+        # übliche Trennzeichen entfernen
+        s = s.replace("/", "").replace(":", "").replace("-", "")
+
+        # bekannte Suffixe entfernen
+        for suffix in [".P", "PERP"]:
+            if s.endswith(suffix):
+                s = s[:-len(suffix)]
+
+        return s
+
     # ─── Signierung ───────────────────────────────────────────────────────────
 
     def _sign(self, params: dict) -> dict:
@@ -93,7 +122,14 @@ class BinanceClient:
 
     def get_position(self, symbol: str) -> dict | None:
         """Holt aktuelle Position für ein Symbol."""
+        raw_symbol = symbol
+        symbol = self.normalize_symbol(symbol)
+
+        if raw_symbol != symbol:
+            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
+
         data = self._request("GET", "/fapi/v2/positionRisk", {"symbol": symbol})
+
         for pos in data:
             if pos["symbol"] == symbol:
                 size = float(pos["positionAmt"])
@@ -129,13 +165,18 @@ class BinanceClient:
 
     def set_leverage(self, symbol: str, leverage: int):
         """Setzt den Leverage für ein Symbol."""
+        raw_symbol = symbol
+        symbol = self.normalize_symbol(symbol)
+
+        if raw_symbol != symbol:
+            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
+
         try:
             return self._request("POST", "/fapi/v1/leverage", {
                 "symbol": symbol,
                 "leverage": leverage
             })
         except Exception as e:
-            # Ignoriere "no need to change" Fehler
             if "No need to change" in str(e):
                 log.debug(f"Leverage bereits auf {leverage}x")
             else:
@@ -143,6 +184,12 @@ class BinanceClient:
 
     def set_margin_type(self, symbol: str, margin_type: str = "ISOLATED"):
         """Setzt den Margin-Typ (CROSSED oder ISOLATED)."""
+        raw_symbol = symbol
+        symbol = self.normalize_symbol(symbol)
+
+        if raw_symbol != symbol:
+            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
+
         try:
             return self._request("POST", "/fapi/v1/marginType", {
                 "symbol": symbol,
@@ -158,7 +205,14 @@ class BinanceClient:
 
     def get_symbol_info(self, symbol: str) -> dict:
         """Holt Handelsinformationen für ein Symbol (Tick Size, Lot Size etc.)."""
+        raw_symbol = symbol
+        symbol = self.normalize_symbol(symbol)
+
+        if raw_symbol != symbol:
+            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
+
         data = self._request("GET", "/fapi/v1/exchangeInfo", signed=False)
+
         for s in data["symbols"]:
             if s["symbol"] == symbol:
                 info = {"symbol": symbol}
@@ -170,13 +224,16 @@ class BinanceClient:
                         info["min_qty"] = float(f["minQty"])
                     elif f["filterType"] == "MIN_NOTIONAL":
                         info["min_notional"] = float(f.get("notional", 5))
+
                 info["quantity_precision"] = s["quantityPrecision"]
                 info["price_precision"] = s["pricePrecision"]
                 return info
+
         raise Exception(f"Symbol {symbol} nicht gefunden")
 
     def round_quantity(self, symbol: str, quantity: float) -> float:
         """Rundet die Quantity auf die erlaubte Precision."""
+        symbol = self.normalize_symbol(symbol)
         info = self.get_symbol_info(symbol)
         precision = info["quantity_precision"]
         step = info["step_size"]
@@ -185,6 +242,7 @@ class BinanceClient:
 
     def round_price(self, symbol: str, price: float) -> float:
         """Rundet den Preis auf die erlaubte Precision."""
+        symbol = self.normalize_symbol(symbol)
         info = self.get_symbol_info(symbol)
         precision = info["price_precision"]
         return round(price, precision)
@@ -193,7 +251,13 @@ class BinanceClient:
 
     def place_market_order(self, symbol: str, side: str, quantity: float) -> dict:
         """Platziert eine Market Order."""
+        raw_symbol = symbol
+        symbol = self.normalize_symbol(symbol)
         quantity = self.round_quantity(symbol, quantity)
+
+        if raw_symbol != symbol:
+            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
+
         log.info(f"📤 Market Order: {side} {quantity} {symbol}")
 
         return self._request("POST", "/fapi/v1/order", {
@@ -205,8 +269,13 @@ class BinanceClient:
 
     def place_limit_order(self, symbol: str, side: str, quantity: float, price: float) -> dict:
         """Platziert eine Limit Order."""
+        raw_symbol = symbol
+        symbol = self.normalize_symbol(symbol)
         quantity = self.round_quantity(symbol, quantity)
         price = self.round_price(symbol, price)
+
+        if raw_symbol != symbol:
+            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
 
         return self._request("POST", "/fapi/v1/order", {
             "symbol": symbol,
@@ -219,8 +288,14 @@ class BinanceClient:
 
     def place_stop_loss(self, symbol: str, side: str, quantity: float, stop_price: float) -> dict:
         """Platziert eine Stop-Market Order (Stop-Loss)."""
+        raw_symbol = symbol
+        symbol = self.normalize_symbol(symbol)
         quantity = self.round_quantity(symbol, quantity)
         stop_price = self.round_price(symbol, stop_price)
+
+        if raw_symbol != symbol:
+            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
+
         log.info(f"📤 Stop-Loss: {side} {quantity} {symbol} @ {stop_price}")
 
         return self._request("POST", "/fapi/v1/order", {
@@ -235,8 +310,14 @@ class BinanceClient:
 
     def place_take_profit(self, symbol: str, side: str, quantity: float, take_profit_price: float) -> dict:
         """Platziert eine Take-Profit-Market Order."""
+        raw_symbol = symbol
+        symbol = self.normalize_symbol(symbol)
         quantity = self.round_quantity(symbol, quantity)
         take_profit_price = self.round_price(symbol, take_profit_price)
+
+        if raw_symbol != symbol:
+            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
+
         log.info(f"📤 Take-Profit: {side} {quantity} {symbol} @ {take_profit_price}")
 
         return self._request("POST", "/fapi/v1/order", {
@@ -253,15 +334,19 @@ class BinanceClient:
 
     def close_position(self, symbol: str) -> dict | None:
         """Schliesst alle offenen Positionen für ein Symbol."""
+        raw_symbol = symbol
+        symbol = self.normalize_symbol(symbol)
+
+        if raw_symbol != symbol:
+            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
+
         pos = self.get_position(symbol)
         if not pos:
             log.info(f"Keine offene Position für {symbol}")
             return None
 
-        # Alle offenen Orders für dieses Symbol canceln
         self.cancel_all_orders(symbol)
 
-        # Position schliessen mit Market Order
         close_side = "SELL" if pos["side"] == "LONG" else "BUY"
         result = self.place_market_order(symbol, close_side, pos["size"])
         log.info(f"🔴 Position geschlossen: {pos['side']} {pos['size']} {symbol}")
@@ -269,6 +354,12 @@ class BinanceClient:
 
     def cancel_all_orders(self, symbol: str) -> dict:
         """Cancelt alle offenen Orders für ein Symbol."""
+        raw_symbol = symbol
+        symbol = self.normalize_symbol(symbol)
+
+        if raw_symbol != symbol:
+            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
+
         try:
             return self._request("DELETE", "/fapi/v1/allOpenOrders", {
                 "symbol": symbol
@@ -281,6 +372,16 @@ class BinanceClient:
 
     def get_mark_price(self, symbol: str) -> float:
         """Holt den aktuellen Mark Price."""
-        data = self._request("GET", "/fapi/v1/premiumIndex",
-                             {"symbol": symbol}, signed=False)
+        raw_symbol = symbol
+        symbol = self.normalize_symbol(symbol)
+
+        if raw_symbol != symbol:
+            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
+
+        data = self._request(
+            "GET",
+            "/fapi/v1/premiumIndex",
+            {"symbol": symbol},
+            signed=False
+        )
         return float(data["markPrice"])
