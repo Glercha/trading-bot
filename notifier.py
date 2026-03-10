@@ -1,6 +1,6 @@
 """
 Telegram Notifier
-Sendet Bot-Benachrichtigungen an Telegram.
+Sendet Trading-Bot Benachrichtigungen an Telegram.
 """
 
 import logging
@@ -17,18 +17,19 @@ class TelegramNotifier:
 
         if self.enabled:
             self.base_url = f"https://api.telegram.org/bot{self.token}"
+            log.info("📲 Telegram Notifier aktiviert")
         else:
             self.base_url = None
-            log.warning("Telegram Notifier deaktiviert: TOKEN oder CHAT_ID fehlt")
+            log.warning("📲 Telegram Notifier deaktiviert (Token oder Chat ID fehlt)")
 
     def send(self, message: str) -> bool:
-        """Sendet eine Telegram Nachricht."""
+        """Sendet eine Nachricht an Telegram."""
         if not self.enabled:
-            log.debug("Telegram deaktiviert, Nachricht wird nicht gesendet")
+            log.debug("Telegram deaktiviert, Nachricht nicht gesendet")
             return False
 
         try:
-            resp = requests.post(
+            response = requests.post(
                 f"{self.base_url}/sendMessage",
                 json={
                     "chat_id": self.chat_id,
@@ -39,10 +40,10 @@ class TelegramNotifier:
                 timeout=10
             )
 
-            data = resp.json()
+            data = response.json()
 
-            if resp.status_code != 200 or not data.get("ok", False):
-                log.error(f"Telegram Fehler: {data}")
+            if response.status_code != 200 or not data.get("ok", False):
+                log.error(f"Telegram API Fehler: {data}")
                 return False
 
             return True
@@ -52,11 +53,11 @@ class TelegramNotifier:
             return False
 
     def send_startup(self, symbol: str, testnet: bool):
-        env = "TESTNET" if testnet else "LIVE"
+        env_name = "TESTNET" if testnet else "LIVE"
         msg = (
             f"🤖 <b>Trading Bot gestartet</b>\n"
             f"Symbol: <code>{symbol}</code>\n"
-            f"Umgebung: <b>{env}</b>"
+            f"Umgebung: <b>{env_name}</b>"
         )
         self.send(msg)
 
@@ -84,7 +85,7 @@ class TelegramNotifier:
         msg = (
             f"🛡️ <b>Trade abgelehnt</b>\n"
             f"Symbol: <code>{ticker}</code>\n"
-            f"Grund: {reason}"
+            f"Grund: <code>{reason}</code>"
         )
         self.send(msg)
 
