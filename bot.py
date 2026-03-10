@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 from config import Config
 from binance_client import BinanceClient
 from risk_manager import RiskManager
+from notifier import TelegramNotifier
 
 
 # ─── Setup ────────────────────────────────────────────────────────────────────
@@ -50,13 +51,19 @@ env_preview = env_api_key[:8] + "..." if env_api_key else "NOT FOUND"
 log.info(f"API Key geladen: '{api_key_preview}' (Länge: {len(config.API_KEY) if config.API_KEY else 0})")
 log.info(f"Direct env: '{env_preview}'")
 
-
 # Flask App
 app = Flask(__name__)
 
 # Binance Client & Risk Manager
 binance = BinanceClient(config)
 risk_mgr = RiskManager(config)
+
+# Telegram Notifier
+notifier = TelegramNotifier(
+    token=getattr(config, "TELEGRAM_BOT_TOKEN", ""),
+    chat_id=getattr(config, "TELEGRAM_CHAT_ID", ""),
+    enabled=getattr(config, "TELEGRAM_ENABLED", True)
+)
 
 
 # ─── Helper ───────────────────────────────────────────────────────────────────
@@ -105,6 +112,7 @@ def webhook():
         passphrase = data.get("passphrase", "")
         if passphrase != config.WEBHOOK_PASSPHRASE:
             log.warning(f"⛔ Ungültige Passphrase: {passphrase}")
+            notifier.send_error("Unauthorized webhook request: invalid passphrase")
             return jsonify({"error": "unauthorized"}), 401
 
         # ─── 3. Signal validieren ─────────────────────────────────────────
@@ -117,12 +125,14 @@ def webhook():
 
         if signal not in ["LONG", "SHORT", "CLOSE"]:
             log.warning(f"⚠️ Unbekanntes Signal: {signal}")
+            notifier.send_error(f"Unknown signal received: {signal}")
             return jsonify({"error": f"unknown signal: {signal}"}), 400
 
         # ─── 4. CLOSE Signal ──────────────────────────────────────────────
         if signal == "CLOSE":
             result = binance.close_position(ticker)
             log.info(f"🔴 Position geschlossen: {ticker}")
+            notifier.send_position_closed(ticker)
 
             return jsonify({
                 "status": "closed",
@@ -156,6 +166,8 @@ def webhook():
 
         if not risk_check["allowed"]:
             log.warning(f"🛡️ Trade abgelehnt: {risk_check['reason']}")
+            notifier.send_rejected(ticker, risk_check["reason"])
+
             return jsonify({
                 "status": "rejected",
                 "raw_ticker": raw_ticker,
@@ -181,6 +193,8 @@ def webhook():
 
         if quantity <= 0:
             log.warning("⚠️ Position Size = 0, Trade übersprungen")
+            notifier.send_rejected(ticker, "Quantity zero after position sizing")
+
             return jsonify({
                 "status": "skipped",
                 "raw_ticker": raw_ticker,
@@ -199,6 +213,7 @@ def webhook():
             if opposite:
                 log.info(f"🔄 Gegenposition erkannt → schliesse {current_pos['side']} {ticker}")
                 binance.close_position(ticker)
+                notifier.send_position_closed(ticker)
             else:
                 log.info(
                     f"ℹ️ Bereits offene Position erkannt: "
@@ -219,6 +234,16 @@ def webhook():
 
         log.info(f"✅ {signal} Order ausgeführt: {ticker} | Qty: {quantity} | Leverage: {leverage}x")
 
+        notifier.send_trade_executed(
+            signal=signal,
+            ticker=ticker,
+            quantity=quantity,
+            price=price,
+            leverage=leverage,
+            sl=sl,
+            tp=tp
+        )
+
         # ─── 11. Stop-Loss setzen ─────────────────────────────────────────
         sl_result = None
         if sl and sl > 0:
@@ -230,6 +255,7 @@ def webhook():
                 stop_price=sl
             )
             log.info(f"🛑 Stop-Loss gesetzt: {sl}")
+            notifier.send_sl_set(ticker, sl)
 
         # ─── 12. Take-Profit setzen ──────────────────────────────────────
         tp_result = None
@@ -242,6 +268,7 @@ def webhook():
                 take_profit_price=tp
             )
             log.info(f"🎯 Take-Profit gesetzt: {tp}")
+            notifier.send_tp_set(ticker, tp)
 
         # ─── 13. Trade loggen ─────────────────────────────────────────────
         risk_mgr.log_trade(
@@ -270,6 +297,10 @@ def webhook():
 
     except Exception as e:
         log.error(f"❌ Fehler: {str(e)}", exc_info=True)
+        try:
+            notifier.send_error(str(e))
+        except Exception:
+            pass
         return jsonify({"error": str(e)}), 500
 
 
@@ -299,7 +330,7 @@ def health():
 def index():
     return jsonify({
         "name": "TradingView → Binance Futures Bot",
-        "version": "1.0.1",
+        "version": "1.0.2",
         "endpoints": {
             "/webhook": "POST — TradingView Alert empfangen",
             "/health": "GET — Status & Balance prüfen"
@@ -309,7 +340,11 @@ def index():
 
 # ─── Start ────────────────────────────────────────────────────────────────────
 
-# Diese Zeilen laufen IMMER (auch unter gunicorn)
 log.info("🚀 Trading Bot gestartet")
 log.info(f"   Symbol: {config.DEFAULT_SYMBOL}")
 log.info(f"   Testnet: {config.USE_TESTNET}")
+
+try:
+    notifier.send_startup(config.DEFAULT_SYMBOL, config.USE_TESTNET)
+except Exception as e:
+    log.warning(f"Telegram Startup Nachricht fehlgeschlagen: {e}")
