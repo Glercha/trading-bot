@@ -60,8 +60,8 @@ risk_mgr = RiskManager(config)
 
 # Telegram Notifier
 notifier = TelegramNotifier(
-    token=getattr(config, "TELEGRAM_BOT_TOKEN", ""),
-    chat_id=getattr(config, "TELEGRAM_CHAT_ID", ""),
+    token=getattr(config, "TELEGRAM_BOT_TOKEN", "8735205351:AAGeEXe1BPgSmNFYqt9uEq0kPX3Uc4F2LyA"),
+    chat_id=getattr(config, "TELEGRAM_CHAT_ID", "1747500351"),
     enabled=getattr(config, "TELEGRAM_ENABLED", True)
 )
 
@@ -88,7 +88,7 @@ def webhook():
 
     Erwartetes JSON Format:
     {
-        "passphrase": "dein_geheimes_passwort",
+        "passphrase": "ajsdljdsaojoOASJojdasj129",
         "signal": "LONG" oder "SHORT" oder "CLOSE",
         "ticker": "BTCUSDT",
         "price": 87000.0,
