@@ -8,6 +8,7 @@ import hmac
 import hashlib
 import logging
 import requests
+import re
 from urllib.parse import urlencode
 
 log = logging.getLogger("TradingBot")
@@ -18,7 +19,7 @@ class BinanceClient:
 
     def __init__(self, config):
         self.config = config
-        self.base_url = config.BASE_URL
+        self.base_url = config.BASE_URL.rstrip("/")
         self.api_key = config.API_KEY
         self.api_secret = config.API_SECRET
         self.session = requests.Session()
@@ -26,7 +27,11 @@ class BinanceClient:
             "X-MBX-APIKEY": self.api_key
         })
 
-    # ─── Symbol Normalisierung ────────────────────────────────────────────────
+        self._exchange_info_cache = None
+        self._exchange_info_cache_ts = 0
+        self._exchange_info_ttl = 300  # 5 Minuten Cache
+
+    # ─── Symbol Normalisierung / Validierung ────────────────────────────────
 
     def normalize_symbol(self, symbol: str) -> str:
         """
@@ -34,26 +39,88 @@ class BinanceClient:
         in gültige Binance Futures Symbole.
 
         Beispiele:
-        BTCUSDT.P   -> BTCUSDT
-        ETHUSDT.P   -> ETHUSDT
-        BTC/USDT    -> BTCUSDT
-        btcusdt     -> BTCUSDT
-        BTCUSDTPERP -> BTCUSDT
+        BTCUSDT.P           -> BTCUSDT
+        ETHUSDT.P           -> ETHUSDT
+        BTC/USDT            -> BTCUSDT
+        btcusdt             -> BTCUSDT
+        BTCUSDTPERP         -> BTCUSDT
+        BINANCE:BTCUSDT.P   -> BTCUSDT
         """
         if not symbol:
             raise ValueError("Leeres Symbol erhalten")
 
         s = str(symbol).upper().strip()
 
-        # übliche Trennzeichen entfernen
-        s = s.replace("/", "").replace(":", "").replace("-", "")
+        # TradingView Exchange Prefix entfernen
+        # Beispiel: BINANCE:BTCUSDT.P -> BTCUSDT.P
+        if ":" in s:
+            s = s.split(":")[-1]
 
-        # bekannte Suffixe entfernen
-        for suffix in [".P", "PERP"]:
+        # Trennzeichen entfernen
+        s = s.replace("/", "").replace("-", "").replace("_", "")
+
+        # Bekannte Suffixe entfernen
+        for suffix in ["USDTPERP", "PERP", ".P"]:
             if s.endswith(suffix):
                 s = s[:-len(suffix)]
 
+        # Alles außer A-Z / 0-9 entfernen
+        s = re.sub(r"[^A-Z0-9]", "", s)
+
+        if not s:
+            raise ValueError(f"Ungültiges Symbol nach Normalisierung: {symbol}")
+
         return s
+
+    def _get_exchange_info(self, force_refresh: bool = False) -> dict:
+        """Lädt ExchangeInfo mit kleinem Cache."""
+        now = time.time()
+        if (
+            not force_refresh
+            and self._exchange_info_cache is not None
+            and (now - self._exchange_info_cache_ts) < self._exchange_info_ttl
+        ):
+            return self._exchange_info_cache
+
+        data = self._request("GET", "/fapi/v1/exchangeInfo", signed=False)
+        self._exchange_info_cache = data
+        self._exchange_info_cache_ts = now
+        return data
+
+    def get_valid_symbols(self, force_refresh: bool = False) -> set:
+        """Gibt alle aktuell gültigen Futures-Symbole zurück."""
+        data = self._get_exchange_info(force_refresh=force_refresh)
+        valid = set()
+
+        for s in data.get("symbols", []):
+            if s.get("status") == "TRADING" and s.get("symbol"):
+                valid.add(s["symbol"].upper())
+
+        return valid
+
+    def validate_symbol(self, symbol: str) -> str:
+        """
+        Normalisiert und validiert ein Symbol gegen Binance Futures.
+        """
+        raw_symbol = symbol
+        normalized = self.normalize_symbol(symbol)
+        valid_symbols = self.get_valid_symbols()
+
+        if normalized in valid_symbols:
+            if raw_symbol != normalized:
+                log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {normalized}")
+            return normalized
+
+        # Cache erneut laden falls veraltet
+        valid_symbols = self.get_valid_symbols(force_refresh=True)
+        if normalized in valid_symbols:
+            if raw_symbol != normalized:
+                log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {normalized}")
+            return normalized
+
+        raise ValueError(
+            f"Ungültiges Futures-Symbol: raw='{raw_symbol}' normalized='{normalized}'"
+        )
 
     # ─── Signierung ───────────────────────────────────────────────────────────
 
@@ -122,12 +189,7 @@ class BinanceClient:
 
     def get_position(self, symbol: str) -> dict | None:
         """Holt aktuelle Position für ein Symbol."""
-        raw_symbol = symbol
-        symbol = self.normalize_symbol(symbol)
-
-        if raw_symbol != symbol:
-            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
-
+        symbol = self.validate_symbol(symbol)
         data = self._request("GET", "/fapi/v2/positionRisk", {"symbol": symbol})
 
         for pos in data:
@@ -165,11 +227,7 @@ class BinanceClient:
 
     def set_leverage(self, symbol: str, leverage: int):
         """Setzt den Leverage für ein Symbol."""
-        raw_symbol = symbol
-        symbol = self.normalize_symbol(symbol)
-
-        if raw_symbol != symbol:
-            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
+        symbol = self.validate_symbol(symbol)
 
         try:
             return self._request("POST", "/fapi/v1/leverage", {
@@ -184,11 +242,7 @@ class BinanceClient:
 
     def set_margin_type(self, symbol: str, margin_type: str = "ISOLATED"):
         """Setzt den Margin-Typ (CROSSED oder ISOLATED)."""
-        raw_symbol = symbol
-        symbol = self.normalize_symbol(symbol)
-
-        if raw_symbol != symbol:
-            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
+        symbol = self.validate_symbol(symbol)
 
         try:
             return self._request("POST", "/fapi/v1/marginType", {
@@ -205,13 +259,8 @@ class BinanceClient:
 
     def get_symbol_info(self, symbol: str) -> dict:
         """Holt Handelsinformationen für ein Symbol (Tick Size, Lot Size etc.)."""
-        raw_symbol = symbol
-        symbol = self.normalize_symbol(symbol)
-
-        if raw_symbol != symbol:
-            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
-
-        data = self._request("GET", "/fapi/v1/exchangeInfo", signed=False)
+        symbol = self.validate_symbol(symbol)
+        data = self._get_exchange_info()
 
         for s in data["symbols"]:
             if s["symbol"] == symbol:
@@ -233,7 +282,7 @@ class BinanceClient:
 
     def round_quantity(self, symbol: str, quantity: float) -> float:
         """Rundet die Quantity auf die erlaubte Precision."""
-        symbol = self.normalize_symbol(symbol)
+        symbol = self.validate_symbol(symbol)
         info = self.get_symbol_info(symbol)
         precision = info["quantity_precision"]
         step = info["step_size"]
@@ -242,7 +291,7 @@ class BinanceClient:
 
     def round_price(self, symbol: str, price: float) -> float:
         """Rundet den Preis auf die erlaubte Precision."""
-        symbol = self.normalize_symbol(symbol)
+        symbol = self.validate_symbol(symbol)
         info = self.get_symbol_info(symbol)
         precision = info["price_precision"]
         return round(price, precision)
@@ -252,17 +301,14 @@ class BinanceClient:
     def place_market_order(self, symbol: str, side: str, quantity: float) -> dict:
         """Platziert eine Market Order."""
         raw_symbol = symbol
-        symbol = self.normalize_symbol(symbol)
+        symbol = self.validate_symbol(symbol)
         quantity = self.round_quantity(symbol, quantity)
 
-        if raw_symbol != symbol:
-            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
-
-        log.info(f"📤 Market Order: {side} {quantity} {symbol}")
+        log.info(f"📤 Market Order: raw={raw_symbol} normalized={symbol} side={side} qty={quantity}")
 
         return self._request("POST", "/fapi/v1/order", {
             "symbol": symbol,
-            "side": side,
+            "side": side.upper(),
             "type": "MARKET",
             "quantity": quantity
         })
@@ -270,16 +316,15 @@ class BinanceClient:
     def place_limit_order(self, symbol: str, side: str, quantity: float, price: float) -> dict:
         """Platziert eine Limit Order."""
         raw_symbol = symbol
-        symbol = self.normalize_symbol(symbol)
+        symbol = self.validate_symbol(symbol)
         quantity = self.round_quantity(symbol, quantity)
         price = self.round_price(symbol, price)
 
-        if raw_symbol != symbol:
-            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
+        log.info(f"📤 Limit Order: raw={raw_symbol} normalized={symbol} side={side} qty={quantity} price={price}")
 
         return self._request("POST", "/fapi/v1/order", {
             "symbol": symbol,
-            "side": side,
+            "side": side.upper(),
             "type": "LIMIT",
             "quantity": quantity,
             "price": price,
@@ -289,18 +334,15 @@ class BinanceClient:
     def place_stop_loss(self, symbol: str, side: str, quantity: float, stop_price: float) -> dict:
         """Platziert eine Stop-Market Order (Stop-Loss)."""
         raw_symbol = symbol
-        symbol = self.normalize_symbol(symbol)
+        symbol = self.validate_symbol(symbol)
         quantity = self.round_quantity(symbol, quantity)
         stop_price = self.round_price(symbol, stop_price)
 
-        if raw_symbol != symbol:
-            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
-
-        log.info(f"📤 Stop-Loss: {side} {quantity} {symbol} @ {stop_price}")
+        log.info(f"📤 Stop-Loss: raw={raw_symbol} normalized={symbol} side={side} qty={quantity} stop={stop_price}")
 
         return self._request("POST", "/fapi/v1/order", {
             "symbol": symbol,
-            "side": side,
+            "side": side.upper(),
             "type": "STOP_MARKET",
             "quantity": quantity,
             "stopPrice": stop_price,
@@ -311,18 +353,15 @@ class BinanceClient:
     def place_take_profit(self, symbol: str, side: str, quantity: float, take_profit_price: float) -> dict:
         """Platziert eine Take-Profit-Market Order."""
         raw_symbol = symbol
-        symbol = self.normalize_symbol(symbol)
+        symbol = self.validate_symbol(symbol)
         quantity = self.round_quantity(symbol, quantity)
         take_profit_price = self.round_price(symbol, take_profit_price)
 
-        if raw_symbol != symbol:
-            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
-
-        log.info(f"📤 Take-Profit: {side} {quantity} {symbol} @ {take_profit_price}")
+        log.info(f"📤 Take-Profit: raw={raw_symbol} normalized={symbol} side={side} qty={quantity} tp={take_profit_price}")
 
         return self._request("POST", "/fapi/v1/order", {
             "symbol": symbol,
-            "side": side,
+            "side": side.upper(),
             "type": "TAKE_PROFIT_MARKET",
             "quantity": quantity,
             "stopPrice": take_profit_price,
@@ -334,11 +373,7 @@ class BinanceClient:
 
     def close_position(self, symbol: str) -> dict | None:
         """Schliesst alle offenen Positionen für ein Symbol."""
-        raw_symbol = symbol
-        symbol = self.normalize_symbol(symbol)
-
-        if raw_symbol != symbol:
-            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
+        symbol = self.validate_symbol(symbol)
 
         pos = self.get_position(symbol)
         if not pos:
@@ -354,11 +389,7 @@ class BinanceClient:
 
     def cancel_all_orders(self, symbol: str) -> dict:
         """Cancelt alle offenen Orders für ein Symbol."""
-        raw_symbol = symbol
-        symbol = self.normalize_symbol(symbol)
-
-        if raw_symbol != symbol:
-            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
+        symbol = self.validate_symbol(symbol)
 
         try:
             return self._request("DELETE", "/fapi/v1/allOpenOrders", {
@@ -372,11 +403,7 @@ class BinanceClient:
 
     def get_mark_price(self, symbol: str) -> float:
         """Holt den aktuellen Mark Price."""
-        raw_symbol = symbol
-        symbol = self.normalize_symbol(symbol)
-
-        if raw_symbol != symbol:
-            log.info(f"🔄 Symbol normalisiert: {raw_symbol} -> {symbol}")
+        symbol = self.validate_symbol(symbol)
 
         data = self._request(
             "GET",
